@@ -30,8 +30,9 @@ logger = logging.getLogger(__name__)
 
 import json
 import os
+import tempfile
 
-CACHE_FILE = os.path.join(os.path.dirname(__file__), ".doc_cache.json")
+CACHE_FILE = os.path.join(tempfile.gettempdir(), "prism_doc_cache.json")
 
 
 class DocumentStore:
