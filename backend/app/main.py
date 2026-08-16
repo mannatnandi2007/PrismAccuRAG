@@ -27,10 +27,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load models at startup."""
-    logger.info("Starting model warmup...")
-    ModelLoader.get().warmup()
-    logger.info("Application ready")
+    """Fast startup: bind port immediately and load models on demand."""
+    logger.info("PrismAccuRAG ready")
     yield
     logger.info("Shutting down")
 

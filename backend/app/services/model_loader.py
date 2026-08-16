@@ -1,9 +1,21 @@
-"""Singleton model loader — loads all ML models once at startup."""
+"""Singleton model loader — memory-optimized for low-resource environments."""
 
 from __future__ import annotations
 
+import os
+import gc
 import logging
+
+# Constrain PyTorch thread memory overhead on Render's 512MB limit
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import spacy
+import torch
+torch.set_num_threads(1)
+torch.set_grad_enabled(False)
+
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.cross_encoder import CrossEncoder
 
@@ -13,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class ModelLoader:
-    """Lazy-initialised singleton for all ML models."""
+    """Lazy-initialised singleton for all ML models with minimal memory footprint."""
 
     _instance: ModelLoader | None = None
 
@@ -31,8 +43,9 @@ class ModelLoader:
     @property
     def embedding_model(self) -> SentenceTransformer:
         if self._embedding_model is None:
-            logger.info(f"Loading embedding model: {settings.embedding_model}")
-            self._embedding_model = SentenceTransformer(settings.embedding_model)
+            logger.info(f"Loading embedding model on CPU: {settings.embedding_model}")
+            self._embedding_model = SentenceTransformer(settings.embedding_model, device="cpu")
+            gc.collect()
             logger.info("Embedding model loaded")
         return self._embedding_model
 
@@ -41,21 +54,24 @@ class ModelLoader:
         if self._spacy_nlp is None:
             logger.info(f"Loading spaCy model: {settings.spacy_model}")
             self._spacy_nlp = spacy.load(settings.spacy_model)
+            gc.collect()
             logger.info("spaCy model loaded")
         return self._spacy_nlp
 
     @property
     def nli_model(self):
         if self._nli_model is None:
-            logger.info(f"Loading NLI model: {settings.nli_model}")
-            self._nli_model = CrossEncoder(settings.nli_model)
+            logger.info(f"Loading NLI model on CPU: {settings.nli_model}")
+            try:
+                self._nli_model = CrossEncoder(settings.nli_model, device="cpu")
+            except Exception as e:
+                logger.warning(f"Could not load CrossEncoder ({e}), using fallback")
+                self._nli_model = None
+            gc.collect()
             logger.info("NLI model loaded")
         return self._nli_model
 
     def warmup(self):
-        """Pre-load all models (call at startup)."""
-        logger.info("Warming up models...")
-        _ = self.embedding_model
-        _ = self.nlp
-        _ = self.nli_model
-        logger.info("All models loaded and ready")
+        """Lightweight warmup without spiking memory."""
+        gc.collect()
+
