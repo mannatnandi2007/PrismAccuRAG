@@ -4,6 +4,8 @@ from __future__ import annotations
 # v1.0.1 - clean answers
 
 import logging
+import os
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -27,7 +29,19 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Fast startup: bind port immediately and load models on demand."""
+    # Asynchronously warm up models in background thread so uvicorn binds port instantly
+    # and models are ready in RAM when the user clicks Ingest
+    def _bg_warmup():
+        try:
+            logger.info("Background model loading started...")
+            ml = ModelLoader.get()
+            _ = ml.embedding_model
+            _ = ml.nlp
+            logger.info("Background model loading complete - ready for requests")
+        except Exception as e:
+            logger.warning(f"Background warmup warning: {e}")
+
+    threading.Thread(target=_bg_warmup, daemon=True).start()
     logger.info("PrismAccuRAG ready")
     yield
     logger.info("Shutting down")
@@ -36,7 +50,7 @@ async def lifespan(app: FastAPI):
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="Adaptive RAG Compressor",
+    title="PrismAccuRAG API",
     description="Accuracy-preserving adaptive RAG context compression pipeline",
     version="1.0.0",
     lifespan=lifespan,
@@ -81,8 +95,8 @@ async def health():
 
 
 @app.post("/api/ingest", response_model=IngestResponse)
-async def ingest_documents(req: IngestRequest):
-    """Ingest documents: chunk, embed, and index in FAISS."""
+def ingest_documents(req: IngestRequest):
+    """Ingest documents: chunk, embed, and index in FAISS (runs in threadpool)."""
     try:
         result = doc_store.ingest(req.documents)
         return IngestResponse(**result)
@@ -92,8 +106,8 @@ async def ingest_documents(req: IngestRequest):
 
 
 @app.post("/api/query", response_model=QueryResponse)
-async def query_pipeline(req: QueryRequest):
-    """Run the full RAG compression pipeline on a query."""
+def query_pipeline(req: QueryRequest):
+    """Run the full RAG compression pipeline on a query (runs in threadpool)."""
     if not doc_store.is_ready:
         raise HTTPException(status_code=400, detail="No documents ingested. Please ingest documents first.")
 
