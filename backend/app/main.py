@@ -53,6 +53,22 @@ app.add_middleware(
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+@app.get("/")
+async def root():
+    return {
+        "status": "online",
+        "service": "PrismAccuRAG API",
+        "version": "1.0.0",
+        "health": "/api/health",
+        "docs": "/docs"
+    }
+
+
+@app.get("/health")
+async def health_ping():
+    return {"status": "ok"}
+
+
 @app.get("/api/health")
 async def health():
     return {
