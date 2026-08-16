@@ -93,3 +93,23 @@ async def query_pipeline(req: QueryRequest):
     except Exception as e:
         logger.error(f"Pipeline failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
+
+
+# ── Static UI Mounting (for unified single-container / Render deployment) ──────
+
+import os
+from fastapi.staticfiles import StaticFiles
+
+# Candidate paths for frontend build
+_possible_dist_paths = [
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../frontend/dist")),
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend/dist")),
+    os.path.abspath("frontend/dist"),
+    os.path.abspath("../frontend/dist"),
+]
+
+for dist_path in _possible_dist_paths:
+    if os.path.exists(dist_path) and os.path.isfile(os.path.join(dist_path, "index.html")):
+        logger.info(f"Serving frontend static files from: {dist_path}")
+        app.mount("/", StaticFiles(directory=dist_path, html=True), name="frontend")
+        break
