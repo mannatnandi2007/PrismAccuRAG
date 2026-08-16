@@ -1,7 +1,7 @@
 <div align="center">
 
 # ⚡ PrismAccuRAG
-### **Accuracy-Preserving Adaptive RAG Compressor**
+### **Accuracy-Preserving Adaptive RAG Context Compressor**
 
 *Surgically compress retrieval context by 30–60% while maintaining 100% factual accuracy.*
 
@@ -16,9 +16,97 @@
 
 </div>
 
+> ## 🚀 **RUNNING LOCALLY (QUICK START GUIDE)**
+> 
+> Follow these simple copy-paste steps to clone, set up, and run **PrismAccuRAG** locally in under 3 minutes.
+
+### 📋 Prerequisites
+- **Python 3.10+** (Python 3.11 recommended)
+- **Node.js 18+** & `npm`
+- Free **Groq API Key** from [console.groq.com/keys](https://console.groq.com/keys)
+
+---
+
+### Step 1: Clone the Repository
+```bash
+git clone https://github.com/mannatnandi2007/PrismAccuRAG.git
+cd PrismAccuRAG
+```
+
+---
+
+### Step 2: Configure Environment Variables
+Create a `.env` file in the root folder:
+```bash
+# Windows (PowerShell):
+Copy-Item .env.example .env
+
+# macOS / Linux (Bash):
+cp .env.example .env
+```
+Open `.env` and add your **Groq API Key**:
+```env
+GROQ_API_KEY=gsk_your_actual_groq_api_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+---
+
+### Step 3: Start the Backend (Terminal 1)
+
+#### **On Windows (PowerShell):**
+```powershell
+cd backend
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+uvicorn app.main:app --reload --port 8000
+```
+
+#### **On macOS / Linux (Bash):**
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+uvicorn app.main:app --reload --port 8000
+```
+
+> 🟢 **Backend API will be running at**: [http://localhost:8000](http://localhost:8000)  
+> 📖 **Interactive Swagger Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)  
+> 🩺 **Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
+
+---
+
+### Step 4: Start the Frontend (Terminal 2)
+
+In a new terminal window:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+> 🌐 **Open the Web UI in your browser**: **[http://localhost:3000](http://localhost:3000)**
+
+---
+
+### Step 5: Test with Sample Document
+1. In the Web UI at `http://localhost:3000`, click **Upload .txt** and select the provided `sample.txt` file (or paste its content into the text area).
+2. Click **Ingest Documents** (the badge turns green).
+3. Try asking multi-hop and factual questions:
+   - *"Why did the person who became the first female professor at the Sorbonne die in 1934?"*
+   - *"What element discovered by the co-winner of the 1903 Nobel Prize was named after his wife's native country?"*
+   - *"How did the Little Curies assist field hospitals in World War I?"*
+4. View the real-time token reduction %, NLI claim entailment breakdown, and synthesized LLM answers!
+
+---
+
 ## 📌 Overview
 
-**PrismAccuRAG** is a full-stack, deployment-ready context compressor for Retrieval-Augmented Generation (RAG). Instead of passing bulky, redundant chunks to costly LLMs, PrismAccuRAG runs a local 10-stage pipeline that parses cross-chunk entity links, builds a dependency graph, intelligently prunes low-value sentences, verifies atomic claims with a local NLI model, and surgically repairs dropped facts before sending the minimal context to the LLM.
+**PrismAccuRAG** is an accuracy-preserving context compressor for Retrieval-Augmented Generation (RAG). Instead of passing bulky, redundant chunks to costly LLMs, PrismAccuRAG runs a local 10-stage pipeline that parses cross-chunk entity links, builds a dependency graph, intelligently prunes low-value sentences, verifies atomic claims with a local NLI model, and surgically repairs dropped facts before sending the minimal context to the LLM.
 
 ---
 
@@ -76,82 +164,13 @@ User Query
 
 ---
 
-## 🚀 Quick Start
-
-### 1. Clone & Configure
-
-```bash
-git clone https://github.com/yourusername/prismax.git
-cd prismax
-```
-
-Copy the environment template and insert your free **Groq API Key** (from [console.groq.com](https://console.groq.com/keys)):
-
-```bash
-cp .env.example .env
-# Edit .env and set GROQ_API_KEY=gsk_...
-```
-
----
-
-### 2. Run Locally
-
-#### **Backend (FastAPI)**
-```powershell
-cd backend
-python -m venv venv
-.\venv\Scripts\activate
-pip install -r requirements.txt
-python -m spacy download en_core_web_sm
-uvicorn app.main:app --reload --port 8000
-```
-
-#### **Frontend (React + Vite)**
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Open your browser at **`http://localhost:3000`**.
-
----
-
-### 3. Deploy to Cloud (Vercel + Render) 🌐
-
-#### **A. Backend on Render (Web Service)**
-1. Push this repository to GitHub.
-2. Go to [dashboard.render.com](https://dashboard.render.com/) → **New +** → **Web Service**.
-3. Connect your repository:
-   - **Root Directory**: `backend`
-   - **Runtime**: `Python`
-   - **Build Command**: `pip install -r requirements.txt && python -m spacy download en_core_web_sm`
-   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-4. In **Environment Variables**, add:
-   - `GROQ_API_KEY`: *your Groq API key*
-   - `GROQ_MODEL`: `llama-3.3-70b-versatile`
-5. Click **Deploy**. Note your Render backend URL (e.g. `https://prismaccurag-backend.onrender.com`).
-
-#### **B. Frontend on Vercel**
-1. Go to [vercel.com](https://vercel.com/) → **Add New Project** → Import your repository.
-2. Configure settings:
-   - **Root Directory**: `frontend`
-   - **Framework Preset**: `Vite`
-3. Under **Environment Variables**, add:
-   - `VITE_API_URL`: *your Render backend URL* (e.g. `https://prismaccurag-backend.onrender.com`)
-4. Click **Deploy**!
-
----
-
-### 4. Run with Docker Compose 🐳
+## 🐳 Run with Docker Compose (Alternative)
 
 ```bash
 docker compose up --build
 ```
-
 - **Frontend App**: `http://localhost:3000`
 - **Backend API**: `http://localhost:8000/docs`
-- **Health Check**: `http://localhost:8000/api/health`
 
 ---
 
