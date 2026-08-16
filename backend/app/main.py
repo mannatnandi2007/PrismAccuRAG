@@ -53,7 +53,7 @@ app.add_middleware(
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {
         "status": "online",
@@ -64,12 +64,12 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_ping():
     return {"status": "ok"}
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health():
     return {
         "status": "healthy",
