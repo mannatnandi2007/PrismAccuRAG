@@ -4,7 +4,9 @@ import QueryInput from './components/QueryInput'
 import ResultsPanel from './components/ResultsPanel'
 import GuidePanel from './components/GuidePanel'
 
-const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api'
+const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+const cleanApiUrl = rawApiUrl ? (rawApiUrl.startsWith('http') ? rawApiUrl : `https://${rawApiUrl}`) : ''
+const API_BASE = cleanApiUrl ? `${cleanApiUrl}/api` : '/api'
 
 export default function App() {
   const [ingested, setIngested] = useState(null)
@@ -27,7 +29,7 @@ export default function App() {
         }
       }
     } catch {
-      // Backend might still be starting up
+      // Backend might still be starting up from cold sleep
     }
   }, [])
 
@@ -45,15 +47,18 @@ export default function App() {
         body: JSON.stringify({ documents }),
       })
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.detail || 'Ingestion failed')
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `Ingestion failed with status ${res.status}`)
       }
       const data = await res.json()
       setIngested(data)
       setResults(null)
       setError(null)
     } catch (e) {
-      setError(e.message)
+      const msg = e.message === 'Failed to fetch' 
+        ? 'Could not connect to backend. If Render is waking up from sleep, please wait 20-30 seconds and try again.'
+        : e.message
+      setError(msg)
       setIngested(null)
     } finally {
       setIngesting(false)
@@ -70,8 +75,8 @@ export default function App() {
         body: JSON.stringify({ query }),
       })
       if (!res.ok) {
-        const data = await res.json()
-        const detail = data.detail || 'Query failed'
+        const data = await res.json().catch(() => ({}))
+        const detail = data.detail || `Query failed with status ${res.status}`
         if (detail.includes('No documents ingested')) {
           setIngested(null)
         }
@@ -80,7 +85,10 @@ export default function App() {
       const data = await res.json()
       setResults(data)
     } catch (e) {
-      setError(e.message)
+      const msg = e.message === 'Failed to fetch' 
+        ? 'Could not connect to backend. Please check your connection or wait for Render to wake up.'
+        : e.message
+      setError(msg)
     } finally {
       setLoading(false)
     }
