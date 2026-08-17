@@ -16,25 +16,40 @@ export default function App() {
   const [ingesting, setIngesting] = useState(false)
   const [error, setError] = useState(null)
 
-  // Sync with backend status
+  // Sync with backend status (with retry for Render cold starts)
   const checkBackendHealth = useCallback(async () => {
     setBackendStatus('checking')
-    try {
-      const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(8000) })
-      if (res.ok) {
-        const data = await res.json()
-        setBackendStatus('online')
-        if (data.documents_ingested && data.chunk_count > 0) {
-          setIngested({
-            chunk_count: data.chunk_count,
-            total_tokens: data.total_tokens || (data.chunk_count * 150),
-          })
+    const maxRetries = 3
+    const retryDelay = 3000 // 3 seconds between retries
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Render free tier can take 30-60s to spin up from cold
+        const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(30000) })
+        if (res.ok) {
+          const data = await res.json()
+          setBackendStatus('online')
+          if (data.documents_ingested && data.chunk_count > 0) {
+            setIngested({
+              chunk_count: data.chunk_count,
+              total_tokens: data.total_tokens || (data.chunk_count * 150),
+            })
+          }
+          return // Success — exit retry loop
+        } else {
+          if (attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, retryDelay))
+            continue
+          }
+          setBackendStatus('offline')
         }
-      } else {
+      } catch {
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, retryDelay))
+          continue
+        }
         setBackendStatus('offline')
       }
-    } catch {
-      setBackendStatus('offline')
     }
   }, [])
 

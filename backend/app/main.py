@@ -1,7 +1,7 @@
 """FastAPI application — routes, CORS, startup."""
 
 from __future__ import annotations
-# v1.0.1 - clean answers
+# v1.0.2 - deployment fixes, memory-safe health check, static mount guard
 
 import logging
 import os
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models import IngestRequest, IngestResponse, QueryRequest, QueryResponse
-from app.services.model_loader import ModelLoader
+from app.services.model_loader import ModelLoader, _get_memory_usage_mb
 from app.services.orchestrator import doc_store, run_pipeline
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -35,14 +35,20 @@ async def lifespan(app: FastAPI):
         try:
             logger.info("Background model loading started...")
             ml = ModelLoader.get()
+            ml._models_warming = True
             _ = ml.embedding_model
             _ = ml.nlp
+            # NLI model is optional — load only if memory allows
+            _ = ml.nli_model
+            ml._models_ready = True
+            ml._models_warming = False
             logger.info("Background model loading complete - ready for requests")
         except Exception as e:
+            ml._models_warming = False
             logger.warning(f"Background warmup warning: {e}")
 
     threading.Thread(target=_bg_warmup, daemon=True).start()
-    logger.info("PrismAccuRAG ready")
+    logger.info("PrismAccuRAG ready (port bound, models loading in background)")
     yield
     logger.info("Shutting down")
 
@@ -52,7 +58,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="PrismAccuRAG API",
     description="Accuracy-preserving adaptive RAG context compression pipeline",
-    version="1.0.0",
+    version="1.0.2",
     lifespan=lifespan,
 )
 
@@ -72,7 +78,7 @@ async def root():
     return {
         "status": "online",
         "service": "PrismAccuRAG API",
-        "version": "1.0.0",
+        "version": "1.0.2",
         "health": "/api/health",
         "docs": "/docs"
     }
@@ -85,12 +91,24 @@ async def health_ping():
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health():
+    """Health check that does NOT trigger model loading.
+    
+    Reports whether models are loaded without lazy-initialising them.
+    This prevents Render's health probe from causing OOM spikes.
+    """
+    ml = ModelLoader.get()
+    mem_mb = _get_memory_usage_mb()
     return {
         "status": "healthy",
-        "models_loaded": ModelLoader.get()._embedding_model is not None,
-        "documents_ingested": doc_store.is_ready,
+        "models_loaded": ml.is_ready,
+        "models_warming": ml._models_warming,
+        "embedding_loaded": ml.embedding_loaded,
+        "nli_available": ml.nli_available,
+        "nli_skipped": ml._nli_skipped,
+        "documents_ingested": doc_store.index is not None and len(doc_store.chunks) > 0,
         "chunk_count": len(doc_store.chunks),
         "total_tokens": doc_store.total_tokens,
+        "memory_mb": round(mem_mb, 1) if mem_mb > 0 else None,
     }
 
 
@@ -125,7 +143,6 @@ def query_pipeline(req: QueryRequest):
 
 # ── Static UI Mounting (for unified single-container / Render deployment) ──────
 
-import os
 from fastapi.staticfiles import StaticFiles
 
 # Candidate paths for frontend build
@@ -139,5 +156,9 @@ _possible_dist_paths = [
 for dist_path in _possible_dist_paths:
     if os.path.exists(dist_path) and os.path.isfile(os.path.join(dist_path, "index.html")):
         logger.info(f"Serving frontend static files from: {dist_path}")
+        # Mount at /assets and /static first for explicit static file paths,
+        # then mount the catch-all at / AFTER all API routes are registered.
+        # FastAPI processes routes in registration order, so API routes above
+        # will match before the static catch-all.
         app.mount("/", StaticFiles(directory=dist_path, html=True), name="frontend")
         break

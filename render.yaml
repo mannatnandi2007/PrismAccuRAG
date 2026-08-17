@@ -3,10 +3,16 @@ services:
     name: prismaccurag-backend
     runtime: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt && python -m spacy download en_core_web_sm && python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', device='cpu')"
+    buildCommand: >
+      pip install -r requirements.txt &&
+      python -m spacy download en_core_web_sm &&
+      python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', device='cpu')" &&
+      python -c "from sentence_transformers.cross_encoder import CrossEncoder; CrossEncoder('cross-encoder/nli-deberta-v3-small', device='cpu')"
     startCommand: python run.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: GROQ_API_KEY
         sync: false
+      - key: PORT
+        generateValue: false

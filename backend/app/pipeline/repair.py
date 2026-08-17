@@ -20,6 +20,10 @@ def repair_context(
     Returns:
         repaired_context: the final compressed + repaired text
         claim_results: list of ClaimResult with status tags
+    
+    If entailment was skipped (all results have passed=True with score=1.0),
+    this effectively becomes a no-op — all claims are "preserved" and no
+    re-insertion is needed.
     """
     # Start with the compressed context sentences
     context_parts = list(compressed_sentences)

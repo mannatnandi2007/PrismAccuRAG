@@ -164,8 +164,11 @@ def run_pipeline(query: str, top_k: int | None = None) -> QueryResponse:
     latency["claim_extraction_ms"] = t.elapsed_ms
 
     # 7. Entailment verification (against compressed text)
+    nli = ml.nli_model  # May be None if memory was insufficient
+    if nli is None:
+        logger.info("NLI model unavailable — entailment verification will be skipped")
     with _timer() as t:
-        entailment_results = verify_claims(claims, compressed_text, ml.nli_model)
+        entailment_results = verify_claims(claims, compressed_text, nli)
     latency["entailment_ms"] = t.elapsed_ms
 
     # 8. Surgical repair

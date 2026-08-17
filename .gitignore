@@ -7,6 +7,8 @@
 venv/
 .venv/
 env/
+backend/venv/
+backend/.venv/
 __pycache__/
 *.py[cod]
 *$py.class
